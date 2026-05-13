@@ -1,0 +1,15 @@
+# Render Blueprint: import in dashboard, then set secret env vars (MONGODB_URI, etc.).
+services:
+  - type: web
+    name: recipe-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MONGODB_URI
+        sync: false
+      - key: AI_GATEWAY_API_KEY
+        sync: false
