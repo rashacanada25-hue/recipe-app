@@ -1,30 +1,62 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const Recipe = require('./Recipe'); // ייבוא המודל שיצרנו קודם
+const Recipe = require('./Recipe');
 
 const app = express();
-app.use(cors()); // מאפשר ל-Frontend לדבר עם השרת
-app.use(express.json()); // מאפשר לשרת לקרוא מידע בפורמט JSON
+app.use(cors());
+app.use(express.json());
 
-mongoose.connect('mongodb+srv://rasha-26:hello123@cluster0.tdvmbnh.mongodb.net/recipe_db?retryWrites=true&w=majority&appName=Cluster0')
+const mongoUri = process.env.MONGODB_URI;
+if (!mongoUri) {
+    console.error('Missing MONGODB_URI — create a .env file (see .env.example)');
+    process.exit(1);
+}
+
+mongoose.connect(mongoUri)
     .then(() => console.log('Connected to MongoDB!'))
     .catch(err => console.error('Connection error:', err));
 
-// 1. נתיב לקבלת כל המתכונים (GET) 
+// נתיב לבדיקה שהשרת עובד
+app.get('/', (req, res) => res.send('Server is running!'));
+
 app.get('/recipes', async (req, res) => {
     const recipes = await Recipe.find();
     res.json(recipes);
 });
 
-// 2. נתיב להוספת מתכון חדש (POST) 
-app.post('/recipes', async (req, res) => {
-    const newRecipe = new Recipe(req.body);
-    await newRecipe.save();
-    res.json(newRecipe);
+// חיפוש לפי שם (תואם ל־SearchRecipes בלקוח)
+function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+app.get('/recipes/search/:query', async (req, res) => {
+    try {
+        const raw = req.params.query ?? '';
+        const q = String(raw).trim();
+        if (!q) {
+            return res.json([]);
+        }
+        const recipes = await Recipe.find({
+            name: new RegExp(escapeRegex(q), 'i')
+        });
+        res.json(recipes);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 });
 
-// 3. נתיב למחיקת מתכון לפי ID (DELETE) 
+app.post('/recipes', async (req, res) => {
+    try {
+        const newRecipe = new Recipe(req.body);
+        await newRecipe.save();
+        res.status(201).json(newRecipe);
+    } catch (err) {
+        res.status(400).json({ message: "שגיאה: שם המתכון עד 15 תווים" });
+    }
+});
+
 app.delete('/recipes/:id', async (req, res) => {
     await Recipe.findByIdAndDelete(req.params.id);
     res.json({ message: 'Recipe deleted' });
